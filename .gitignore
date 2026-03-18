@@ -1,0 +1,43 @@
+node_modules/
+dist/
+results/
+
+# Build artifacts
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Images / screenshots (except README assets)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.webp
+!assets/**
+
+# Playwright MCP logs and cache
+.playwright-mcp/
+
+# Scratch/test files
+*.test.js
+chromium_test_fixed.js
+playwright_test_alternatives.js
+simple_browser_test.js
+simple_test.js
+synthetic_user_testing.js
+browser_cleanup_and_test.sh
+working_test.png
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Env
+.env
+.env.local

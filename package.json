@@ -1,0 +1,29 @@
+{
+  "name": "ux-test",
+  "version": "0.1.0",
+  "description": "Synthetic user testing powered by Claude AI",
+  "type": "module",
+  "bin": {
+    "ux-test": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "ui": "tsx src/server.ts",
+    "test": "vitest run",
+    "postinstall": "cd node_modules/playwright && node cli.js install chromium || true",
+    "setup": "npm install && npx @playwright/mcp@0.0.28 --help > /dev/null && echo 'Setup complete — run: npm run ui'"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "@playwright/mcp": "0.0.28",
+    "commander": "^12.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
