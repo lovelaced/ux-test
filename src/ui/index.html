@@ -981,6 +981,95 @@
     }
 
     .exec-key-findings li { margin-bottom: 0.2rem; }
+
+    /* History button */
+    .btn-history {
+      font-family: var(--sans);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--teal);
+      background: none;
+      border: 1px solid var(--rule);
+      border-radius: 5px;
+      padding: 0.2rem 0.6rem;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+
+    .btn-history:hover { border-color: var(--teal); background: var(--teal-wash); }
+
+    /* History list */
+    .run-card {
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      padding: 0.875rem 1rem;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .run-card:hover { border-color: var(--teal); background: var(--teal-ghost); }
+
+    .run-card-left { flex: 1; min-width: 0; }
+
+    .run-card-url {
+      font-family: var(--mono);
+      font-size: 0.8125rem;
+      color: var(--ink);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .run-card-meta {
+      font-size: 0.6875rem;
+      color: var(--ink-4);
+      margin-top: 0.125rem;
+    }
+
+    .run-card-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    .run-card-stat {
+      text-align: center;
+    }
+
+    .run-card-stat-val {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .run-card-stat-label {
+      font-size: 0.5625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink-4);
+    }
+
+    .run-verdict {
+      font-family: var(--mono);
+      font-size: 0.625rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+    }
+
+    .run-verdict.excellent, .run-verdict.good { background: var(--green-wash); color: var(--green); }
+    .run-verdict.mixed { background: var(--amber-wash); color: var(--amber); }
+    .run-verdict.frustrating, .run-verdict.unusable { background: var(--red-wash); color: var(--red); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 </head>
@@ -992,8 +1081,9 @@
       <span class="logo">ux test<span class="logo-dot"></span></span>
       <span class="topbar-tag">claude-powered</span>
     </div>
-    <div class="topbar-right" id="conn-status">
-      <span class="connection-dot"></span> Ready
+    <div class="topbar-right">
+      <button class="btn-history" onclick="showView('history')">History</button>
+      <span id="conn-status" style="margin-left:0.5rem"><span class="connection-dot"></span> Ready</span>
     </div>
   </div>
 
@@ -1120,6 +1210,19 @@
       <button class="btn btn-secondary btn-md" onclick="downloadMarkdown()">Download Markdown</button>
       <button class="btn btn-secondary btn-md" onclick="showView('progress')">Back to log</button>
       <button class="btn btn-primary btn-md" onclick="newTest()">New test</button>
+    </div>
+  </section>
+
+  <!-- ═══════ HISTORY ═══════ -->
+  <section id="history-view" class="hidden">
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div class="section-head" style="margin:0">Past runs</div>
+        <button class="btn btn-secondary btn-md" onclick="showView('config')">New test</button>
+      </div>
+      <div id="history-list">
+        <p style="color:var(--ink-4);font-size:0.8125rem">Loading...</p>
+      </div>
     </div>
   </section>
 </div>
@@ -1697,7 +1800,9 @@
     document.getElementById('config-view').classList.toggle('hidden', v !== 'config');
     document.getElementById('progress-view').classList.toggle('hidden', v !== 'progress');
     document.getElementById('report-view').classList.toggle('hidden', v !== 'report');
+    document.getElementById('history-view').classList.toggle('hidden', v !== 'history');
     window.scrollTo(0,0);
+    if (v === 'history') loadHistory();
   }
 
   function newTest() {
@@ -1951,6 +2056,59 @@
       }, 100);
     }
   };
+
+  // ── History ──
+  async function loadHistory() {
+    const container = document.getElementById('history-list');
+    try {
+      const res = await fetch('/api/runs');
+      const runs = await res.json();
+      if (!runs.length) {
+        container.innerHTML = '<p style="color:var(--ink-4);font-size:0.8125rem">No past runs found. Run a test to see it here.</p>';
+        return;
+      }
+      container.innerHTML = runs.map(r => {
+        const date = new Date(r.testDate);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        let hostname = r.url;
+        try { hostname = new URL(r.url).hostname; } catch {}
+        return `
+          <div class="run-card" onclick="loadSavedRun('${esc(r.runId)}')">
+            <div class="run-card-left">
+              <div class="run-card-url">${esc(hostname)}</div>
+              <div class="run-card-meta">${dateStr} ${timeStr} · ${r.personaCount} personas · ${fmtDuration(r.durationMs)}</div>
+            </div>
+            <div class="run-card-right">
+              <div class="run-card-stat">
+                <div class="run-card-stat-val">${r.issueCount}</div>
+                <div class="run-card-stat-label">Issues</div>
+              </div>
+              <div class="run-card-stat">
+                <div class="run-card-stat-val">${r.frustrationCount}</div>
+                <div class="run-card-stat-label">Frustrations</div>
+              </div>
+              <span class="run-verdict ${r.verdict}">${esc(r.verdict)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (e) {
+      container.innerHTML = `<p style="color:var(--red);font-size:0.8125rem">Failed to load history: ${esc(String(e))}</p>`;
+    }
+  }
+
+  async function loadSavedRun(runId) {
+    try {
+      const res = await fetch(`/api/runs/${encodeURIComponent(runId)}/report`);
+      if (!res.ok) throw new Error('Report not found');
+      currentReport = await res.json();
+      renderReport(currentReport);
+      showView('report');
+    } catch (e) {
+      alert('Failed to load run: ' + e.message);
+    }
+  }
 
   init();
 </script>

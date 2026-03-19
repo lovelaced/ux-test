@@ -9,9 +9,10 @@ import { aggregateResults } from "./reporting/aggregator.js";
 import { validateConfig } from "./config.js";
 import { PERSONA_DEFINITIONS } from "./personas/definitions.js";
 import { killOrphanedBrowsers } from "./utils/cleanup.js";
+import { saveRun, listRuns, loadReport, loadPersonaResult } from "./utils/storage.js";
 import { DEFAULT_CONFIG } from "./types.js";
 import type { AggregatedReport } from "./reporting/types.js";
-import type { TestProgressEvent } from "./types.js";
+import type { TestConfig, TestProgressEvent, PersonaResult } from "./types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -31,7 +32,10 @@ function resolveUiPath(): string {
 interface ActiveTest {
   emitter: EventEmitter;
   status: "running" | "complete" | "error";
+  config: TestConfig;
+  results: PersonaResult[];
   report: AggregatedReport | null;
+  runId: string | null;
   events: TestProgressEvent[];
   error?: string;
   createdAt: number;
@@ -127,7 +131,10 @@ const server = createServer(async (req, res) => {
       const test: ActiveTest = {
         emitter,
         status: "running",
+        config,
+        results: [],
         report: null,
+        runId: null,
         events: [],
         createdAt: Date.now(),
       };
@@ -142,16 +149,23 @@ const server = createServer(async (req, res) => {
       const testStart = Date.now();
       runTest(config, emitter)
         .then((results) => {
+          test.results = results;
           try {
             const report = aggregateResults(results, config, Date.now() - testStart);
             test.report = report;
             test.status = "complete";
+
+            // Persist to disk
+            try {
+              test.runId = saveRun(config, results, report);
+            } catch (saveErr) {
+              console.error("Failed to save run to disk:", saveErr);
+            }
           } catch (aggErr) {
             console.error("Report aggregation failed:", aggErr);
             test.status = "error";
             test.error = `Report generation failed: ${aggErr}`;
           }
-          // Always emit report:ready so the UI can show whatever we have
           emitter.emit("progress", { type: "report:ready" } satisfies TestProgressEvent);
         })
         .catch((err) => {
@@ -161,7 +175,6 @@ const server = createServer(async (req, res) => {
             type: "test:error",
             error: String(err),
           } satisfies TestProgressEvent);
-          // Still emit report:ready so user can at least see the error
           emitter.emit("progress", { type: "report:ready" } satisfies TestProgressEvent);
         });
 
@@ -218,6 +231,41 @@ const server = createServer(async (req, res) => {
         return;
       }
       json(res, test.report);
+      return;
+    }
+
+    // ── Run History Endpoints ──
+
+    // List all saved runs
+    if (path === "/api/runs" && req.method === "GET") {
+      json(res, listRuns());
+      return;
+    }
+
+    // Load a saved report by runId
+    const runReportMatch = path.match(/^\/api\/runs\/([^/]+)\/report$/);
+    if (runReportMatch && req.method === "GET") {
+      const runId = decodeURIComponent(runReportMatch[1]);
+      const report = loadReport(runId);
+      if (!report) {
+        json(res, { error: "Run not found" }, 404);
+        return;
+      }
+      json(res, report);
+      return;
+    }
+
+    // Load an individual persona result from a saved run
+    const personaMatch = path.match(/^\/api\/runs\/([^/]+)\/personas\/([^/]+)$/);
+    if (personaMatch && req.method === "GET") {
+      const runId = decodeURIComponent(personaMatch[1]);
+      const personaId = decodeURIComponent(personaMatch[2]);
+      const result = loadPersonaResult(runId, personaId);
+      if (!result) {
+        json(res, { error: "Persona result not found" }, 404);
+        return;
+      }
+      json(res, result);
       return;
     }
 
