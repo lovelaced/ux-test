@@ -1,4 +1,4 @@
-import type { PersonaResult, TestConfig, ThresholdConfig } from "../types.js";
+import type { PageVisit, PersonaResult, TestConfig, ThresholdConfig } from "../types.js";
 import { buildClickHeatmaps, findFirstInteractions } from "../metrics/interaction.js";
 import type {
   AggregatedReport,
@@ -370,6 +370,35 @@ function buildIssuesList(
     }
   }
 
+  // Design issues from UI/UX design personas
+  const DESIGN_PERSONA_IDS = new Set([
+    "visual-design-critic",
+    "interface-design-evaluator",
+    "design-consistency-auditor",
+    "motion-animation-evaluator",
+    "typography-color-critic",
+  ]);
+
+  const designResults = results.filter((r) => DESIGN_PERSONA_IDS.has(r.personaId));
+  for (const result of designResults) {
+    for (const signal of result.frustrationSignals) {
+      // Avoid duplicating signals already captured by the general frustration analysis
+      const isDuplicate = issues.some(
+        (i) => i.url === signal.url && i.description === signal.description
+      );
+      if (!isDuplicate) {
+        issues.push({
+          severity: signal.severity === "high" ? "high" : "medium",
+          category: "design",
+          description: signal.description,
+          affectedPersonas: [result.personaId],
+          url: signal.url,
+          evidence: `${result.personaId} reported: ${signal.description}`,
+        });
+      }
+    }
+  }
+
   // Sort by severity
   const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
   issues.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
@@ -453,6 +482,29 @@ function buildRecommendations(
     recs.push(
       `${keyboardResult.frustrationSignals.length} accessibility issue(s) found by keyboard-only testing. Ensure all interactive elements are focusable with visible focus indicators.`
     );
+  }
+
+  // Design recommendations from UI/UX personas
+  const designPersonaIds = new Set([
+    "visual-design-critic",
+    "interface-design-evaluator",
+    "design-consistency-auditor",
+    "motion-animation-evaluator",
+    "typography-color-critic",
+  ]);
+  const designResults = results.filter((r) => designPersonaIds.has(r.personaId));
+  const designSignals = designResults.flatMap((r) => r.frustrationSignals);
+  if (designSignals.length > 0) {
+    const highDesign = designSignals.filter((s) => s.severity === "high");
+    if (highDesign.length > 0) {
+      recs.push(
+        `${highDesign.length} high-severity design issue(s) found by UI/UX design personas. Review visual consistency, typography hierarchy, color intentionality, and motion quality.`
+      );
+    } else {
+      recs.push(
+        `${designSignals.length} design observation(s) from UI/UX personas. Review the detailed findings for visual design, interface design, and consistency improvements.`
+      );
+    }
   }
 
   if (recs.length === 0) {
@@ -543,24 +595,60 @@ function buildExecutiveSummary(
 }
 
 /**
- * Shorten a URL to a readable label for flow diagrams.
+ * Shorten a URL to a readable path label for flow diagrams.
  */
-function urlToLabel(url: string): string {
+function urlToPathLabel(url: string): string {
   try {
     const u = new URL(url);
-    const path = u.pathname === "/" ? "Home" : u.pathname.replace(/^\//, "").replace(/\/$/, "");
-    // Convert /foo/bar to "foo / bar", capitalize first letter
-    return path
-      .split("/")
-      .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1))
-      .join(" / ")
-      || "Home";
+    const path = u.pathname === "/" ? "" : u.pathname.replace(/^\//, "").replace(/\/$/, "");
+    if (!path) return "Home";
+    return "/" + path;
   } catch {
     return url.slice(0, 30);
   }
 }
 
+/**
+ * Build a label for a page visit. Uses the page title when it's unique
+ * across all visits; falls back to the URL path slug when multiple
+ * pages share the same title (e.g. an SPA that always sets "Home").
+ */
+function resolveLabels(visits: PageVisit[]): Map<string, string> {
+  // Collect title per unique URL
+  const urlTitle = new Map<string, string>();
+  for (const v of visits) {
+    if (!urlTitle.has(v.url)) urlTitle.set(v.url, v.title?.trim() || "");
+  }
+
+  // Find which titles are shared by multiple distinct URLs
+  const titleUrls = new Map<string, Set<string>>();
+  for (const [url, title] of urlTitle) {
+    const key = title.toLowerCase();
+    if (!titleUrls.has(key)) titleUrls.set(key, new Set());
+    titleUrls.get(key)!.add(url);
+  }
+
+  const labels = new Map<string, string>();
+  for (const [url, title] of urlTitle) {
+    const key = title.toLowerCase();
+    const isDuplicate = (titleUrls.get(key)?.size ?? 0) > 1;
+
+    if (!title || isDuplicate) {
+      // No title or title collision — use the URL path as the label
+      labels.set(url, urlToPathLabel(url));
+    } else {
+      labels.set(url, title);
+    }
+  }
+
+  return labels;
+}
+
 function buildPersonaFlows(results: PersonaResult[]): PersonaFlow[] {
+  // Resolve labels across ALL personas so the same URL gets the same label everywhere
+  const allVisits = results.flatMap((r) => r.navigationPath);
+  const labelMap = resolveLabels(allVisits);
+
   return results.map((r) => {
     const visits = r.navigationPath;
     if (visits.length === 0) {
@@ -576,7 +664,7 @@ function buildPersonaFlows(results: PersonaResult[]): PersonaFlow[] {
     const steps: PersonaFlow["steps"] = [];
     for (const v of visits) {
       if (steps.length === 0 || steps[steps.length - 1].url !== v.url) {
-        steps.push({ label: urlToLabel(v.url), url: v.url, dwellMs: v.dwellTimeMs });
+        steps.push({ label: labelMap.get(v.url) ?? urlToPathLabel(v.url), url: v.url, dwellMs: v.dwellTimeMs });
       } else {
         // Merge dwell time for consecutive visits to same page
         steps[steps.length - 1].dwellMs += v.dwellTimeMs;
@@ -584,8 +672,6 @@ function buildPersonaFlows(results: PersonaResult[]): PersonaFlow[] {
     }
 
     // Build Mermaid graph
-    // Node IDs: n0, n1, n2, ...
-    // Use short labels, show dwell time as tooltip
     const nodeIds = steps.map((_, i) => `n${i}`);
     let mermaid = "graph LR\n";
 

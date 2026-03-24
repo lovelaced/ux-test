@@ -343,6 +343,11 @@
     }
 
     .persona-controls button:hover { text-decoration: underline; }
+    .persona-controls-sep {
+      width: 1px;
+      background: var(--ink-2);
+      align-self: stretch;
+    }
 
     /* ── Collapsible ── */
     details summary {
@@ -1122,8 +1127,13 @@
       <div class="section-head">Personas</div>
       <div class="panel">
         <div class="persona-controls">
-          <button onclick="selectAll(true)">Select all</button>
-          <button onclick="selectAll(false)">Clear</button>
+          <button onclick="selectAll(true)">All</button>
+          <button onclick="selectAll(false)">None</button>
+          <span class="persona-controls-sep"></span>
+          <button onclick="selectByGroup('desktop')">Desktop</button>
+          <button onclick="selectByGroup('mobile')">Mobile</button>
+          <button onclick="selectByGroup('a11y')">Accessibility</button>
+          <button onclick="selectByGroup('design')">Design</button>
         </div>
         <div class="persona-grid" id="persona-grid"></div>
       </div>
@@ -1273,6 +1283,23 @@
 
   function selectAll(on) {
     document.querySelectorAll('#persona-grid input[type="checkbox"]').forEach(cb => {
+      cb.checked = on;
+      cb.closest('.persona-item').classList.toggle('active', on);
+    });
+  }
+
+  const A11Y_IDS = new Set(['keyboard-only', 'screen-reader']);
+  const DESIGN_IDS = new Set(['visual-design-critic', 'interface-design-evaluator', 'design-consistency-auditor', 'motion-animation-evaluator', 'typography-color-critic']);
+
+  function selectByGroup(group) {
+    document.querySelectorAll('#persona-grid input[type="checkbox"]').forEach(cb => {
+      const p = personas.find(pp => pp.id === cb.value);
+      if (!p) return;
+      let on = false;
+      if (group === 'desktop') on = p.deviceType === 'desktop' && !A11Y_IDS.has(p.id) && !DESIGN_IDS.has(p.id);
+      else if (group === 'mobile') on = p.deviceType === 'mobile';
+      else if (group === 'a11y') on = A11Y_IDS.has(p.id);
+      else if (group === 'design') on = DESIGN_IDS.has(p.id);
       cb.checked = on;
       cb.closest('.persona-item').classList.toggle('active', on);
     });

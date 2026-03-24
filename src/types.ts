@@ -50,7 +50,16 @@ export type PersonaId =
   | "screen-reader"
   | "search-first"
   | "mobile-novice"
-  | "mobile-power";
+  | "mobile-power"
+  | "mobile-technical"
+  | "mobile-commuter"
+  | "mobile-elderly"
+  | "mobile-multitasker"
+  | "visual-design-critic"
+  | "interface-design-evaluator"
+  | "design-consistency-auditor"
+  | "motion-animation-evaluator"
+  | "typography-color-critic";
 
 // ── Results ──
 

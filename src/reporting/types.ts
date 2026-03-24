@@ -95,7 +95,7 @@ export interface FirstInteraction {
 
 export interface SeverityRankedIssue {
   severity: "critical" | "high" | "medium" | "low";
-  category: "performance" | "usability" | "accessibility" | "functionality";
+  category: "performance" | "usability" | "accessibility" | "functionality" | "design";
   description: string;
   affectedPersonas: string[];
   url: string;
