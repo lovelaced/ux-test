@@ -2,7 +2,7 @@
 
 # ux test
 
-*AI-powered synthetic user testing for any website. Ten personas, real browsers, one report.*
+*AI-powered synthetic user testing for any website. 19 personas, real browsers, one report.*
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
@@ -12,16 +12,17 @@
 
 ---
 
-<!-- TODO: Add hero screenshot of the report view — capture with Xnapper or CleanShot X -->
-<!-- Place in assets/screenshots/report-hero.png -->
+<div align="center">
+  <img src="assets/screenshots/report-hero.png" alt="ux test report showing executive summary, per-persona verdicts, and severity-ranked issues table" width="700">
+</div>
 
-Point ux test at any URL and it launches parallel AI personas — a novice, a power user, a keyboard-only tester, a mobile user — each browsing your site in its own headless browser. They click, navigate, get frustrated, and write up their findings. You get a structured report with severity-ranked issues, frustration signals, performance metrics, navigation flow diagrams, and per-persona narratives.
+Point ux test at any URL and it launches parallel AI personas — a novice, a power user, a keyboard-only tester, a mobile commuter, a visual design critic — each browsing your site in its own headless browser. They click, navigate, get frustrated, and write up their findings. You get a structured report with severity-ranked issues, frustration signals, performance metrics, navigation flow diagrams, and per-persona narratives.
 
 No API key needed. Uses your existing Claude Code login.
 
 ## Features
 
-- **10 distinct personas** — Novice, explorer, intermediate, power user, impatient scanner, keyboard-only, screen reader, search-first, mobile novice, mobile power
+- **19 distinct personas** — Novice, explorer, power user, accessibility testers, 6 mobile profiles, and 5 design-focused critics
 - **Real browser testing** — Each persona gets an isolated headless Chromium instance via Playwright MCP
 - **Parallel execution** — Run 3+ personas simultaneously with configurable concurrency
 - **Frustration detection** — Rage clicks, dead clicks, navigation loops, excessive dwell time
@@ -79,20 +80,46 @@ npm run dev -- run --url https://yoursite.com
 
 Each persona has distinct behavioral traits, navigation strategies, patience levels, and stopping criteria.
 
-| Persona | Strategy | Patience | Device | What it tests |
-|---------|----------|----------|--------|---------------|
-| **Novice (Goal-Directed)** | Visual-first | Normal | Desktop | CTA clarity, jargon, visual hierarchy |
-| **Novice (Explorer)** | Visual-first | Patient | Desktop | Discoverability, secondary navigation, dead clicks |
-| **Intermediate** | Menu-first | Normal | Desktop | Form validation, consistency, search |
-| **Power User** | Menu-first | Impatient | Desktop | Efficiency, edge cases, keyboard shortcuts |
-| **Impatient Scanner** | Visual-first | Impatient | Desktop | Load speed, scan-ability, fast abandonment |
-| **Keyboard-Only** | Keyboard | Patient | Desktop | Focus order, skip links, focus traps, ARIA |
-| **Screen Reader** | Keyboard | Patient | Desktop | Heading hierarchy, alt text, landmarks, labels |
-| **Search-First** | Search | Normal | Desktop | Search quality, autocomplete, fallback nav |
-| **Mobile Novice** | Visual-first | Normal | iPhone 14 | Tap targets, responsive layout, hamburger menus |
-| **Mobile Power** | Menu-first | Impatient | iPhone 14 Pro | Mobile forms, input types, thumb reach |
+### Desktop
+
+| Persona | Strategy | Patience | What it tests |
+|---------|----------|----------|---------------|
+| **Novice (Goal-Directed)** | Visual-first | Normal | CTA clarity, jargon, visual hierarchy |
+| **Novice (Explorer)** | Visual-first | Patient | Discoverability, secondary navigation, dead clicks |
+| **Intermediate** | Menu-first | Normal | Form validation, consistency, search |
+| **Power User** | Menu-first | Impatient | Efficiency, edge cases, keyboard shortcuts |
+| **Impatient Scanner** | Visual-first | Impatient | Load speed, scan-ability, fast abandonment |
+| **Search-First** | Search | Normal | Search quality, autocomplete, fallback nav |
+
+### Accessibility
+
+| Persona | Strategy | Patience | What it tests |
+|---------|----------|----------|---------------|
+| **Keyboard-Only** | Keyboard | Patient | Focus order, skip links, focus traps, ARIA |
+| **Screen Reader** | Keyboard | Patient | Heading hierarchy, alt text, landmarks, labels |
 
 Accessibility personas (`keyboard-only`, `screen-reader`) have `browser_click` disabled at the SDK level — they literally cannot use the mouse.
+
+### Mobile
+
+| Persona | Patience | Device | What it tests |
+|---------|----------|--------|---------------|
+| **Mobile Novice** | Normal | iPhone 14 | Tap targets, responsive layout, hamburger menus |
+| **Mobile Power** | Impatient | iPhone 14 Pro | Mobile forms, input types, thumb reach |
+| **Mobile Technical** | Normal | iPhone 14 Pro | Responsive implementation, PWA features, input types |
+| **Mobile Commuter** | Impatient | iPhone 14 | Speed under pressure, content scanability, interstitials |
+| **Mobile Elderly** | Patient | Pixel 7 | Text size, tap target size, icon labels, gesture reliance |
+| **Mobile Multitasker** | Normal | iPhone 14 Pro | State persistence, deep linking, shareable URLs |
+
+### UI/UX Design
+
+| Persona | Focus | What it tests |
+|---------|-------|---------------|
+| **Visual Design Critic** | Visual craft | Color intentionality, shadow quality, spacing, icon consistency |
+| **Interface Design Evaluator** | UX patterns | Focusing mechanism, progressive disclosure, feedback loops |
+| **Design Consistency Auditor** | Systems | Cross-page pattern consistency, component reuse, visual cohesion |
+| **Motion & Animation Evaluator** | Motion | Transitions, hover feedback, scroll animations, layout shift |
+| **Typography & Color Critic** | Type & color | Typographic hierarchy, font pairing, palette, contrast |
 
 ## Report Contents
 
@@ -142,14 +169,17 @@ Create `ux-test.config.json` in the project root:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-u, --url` | (required) | Target URL |
-| `-t, --task` | — | Task description (repeatable) |
+| `-t, --task` | — | Task descriptions (variadic, can specify multiple) |
 | `-p, --personas` | all | Persona IDs to run |
 | `-c, --concurrency` | 3 | Max parallel agents |
 | `--max-turns` | 25 | Max agent turns per persona |
-| `--max-timeout` | 300 | Timeout per persona (seconds) |
-| `--browser` | chromium | Browser engine |
-| `-f, --format` | json markdown | Output formats |
+| `--headless` / `--no-headless` | true | Run browsers headless or headed (visible) |
+| `--browser` | chrome | Browser engine: chrome, firefox, webkit |
+| `--viewport` | 1280x720 | Viewport size (WxH) |
+| `-f, --format` | json markdown | Output formats: json, markdown, html |
 | `-o, --output` | ./results | Output directory |
+| `--config` | — | Path to config file |
+| `--verbose` | false | Enable verbose logging |
 
 ## How It Works
 
@@ -192,21 +222,25 @@ src/
   config.ts             Zod-validated configuration
   types.ts              Shared TypeScript types
   personas/
-    definitions.ts      10 persona definitions with behavioral traits
+    definitions.ts      19 persona definitions with behavioral traits
     index.ts            Prompt builder (system prompt + user prompt)
     types.ts            PersonaDefinition interface
   metrics/
-    collector.ts        SDK MCP server with 6 metric-recording tools
+    index.ts            Metrics module barrel export
+    types.ts            Metric type definitions
+    collector.ts        SDK MCP server with metric-recording tools
     frustration.ts      Post-processing frustration signal detection
     interaction.ts      Click heatmaps, first-interaction analysis
     performance.ts      JS snippet for Core Web Vitals collection
   reporting/
+    index.ts            Reporting module barrel export
     aggregator.ts       Cross-persona data aggregation + issue ranking
     formatter.ts        JSON / Markdown / HTML output
     types.ts            Report type definitions
   utils/
     cleanup.ts          Orphaned browser process detection + cleanup
     logger.ts           Structured logging
+    storage.ts          Persistent run storage + retrieval
   ui/
     index.html          Single-page web app (vanilla JS, no build step)
 ```
